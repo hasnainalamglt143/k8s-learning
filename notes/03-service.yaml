@@ -1,0 +1,63 @@
+# 04 - Services
+
+## Why
+- Pod IPs change when pods are recreated
+- Multiple replicas need load balancing
+Service = stable IP + stable DNS name + load balancing across matching pods
+
+## How it finds pods
+- `selector` matches pod labels
+- Matched pod IPs = **Endpoints** (auto-updated as pods come/go)
+- Unready pods are excluded
+- kube-proxy: network rules that forward Service IP → pod IPs
+- CoreDNS: resolves service names
+
+## DNS
+<service>.<namespace>.svc.cluster.local
+Same namespace: just `<service>` (e.g. DB_HOST=postgres)
+
+## Types
+| Type | Access | Use |
+|---|---|---|
+| ClusterIP (default) | inside cluster only | DB, Redis, internal APIs |
+| NodePort | NodeIP:30000-32767 | testing / simple |
+| LoadBalancer | cloud LB, public IP | production on cloud |
+| Headless (clusterIP: None) | DNS → pod IPs directly | StatefulSets / DBs |
+| ExternalName | DNS alias to external host | external DB etc. |
+NodePort ⊃ ClusterIP; LoadBalancer ⊃ NodePort
+
+## Ports
+- port: Service port (clients use)
+- targetPort: container port
+- nodePort: node port (NodePort/LB)
+Flow: client → Service:port → Pod:targetPort
+
+## YAML
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+
+## minikube
+- NodePort: `minikube service <name> --url`
+- LoadBalancer: EXTERNAL-IP <pending> until `minikube tunnel` (no cloud)
+
+## Commands
+kubectl get svc
+kubectl get endpoints <svc>
+kubectl describe svc <svc>
+kubectl get pods --show-labels
+kubectl run client --rm -it --image=busybox -- sh   → wget -qO- web
+kubectl expose deployment web --port=80 --target-port=80
+
+## Debug: service not working
+1. endpoints empty? → selector/label mismatch
+2. targetPort = container port?
+3. pods Running and Ready?
